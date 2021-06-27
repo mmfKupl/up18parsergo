@@ -1,4 +1,4 @@
-package main
+package parser
 
 import (
 	"fmt"
@@ -10,19 +10,21 @@ import (
 	"strings"
 )
 
-func getValidPath(elem ...string) string {
-	items := []string{baseFolderToSave}
+const BaseFolderToSave = "data"
+
+func GetValidPath(elem ...string) string {
+	items := []string{BaseFolderToSave}
 	return path.Join(append(items, elem...)...)
 }
 
-func downloadImageIfNeed(url string, params *ParserParams) (string, error) {
+func DownloadImageIfNeed(url string, params *ParserParams, base url.URL) (string, error) {
 
-	fullUrl, err := getValidLink(url)
+	fullUrl, err := GetValidLink(url, base)
 	if err != nil {
 		return "", err
 	}
-	imageName := getImageNameFromUrl(fullUrl)
-	imagePath := getValidPath(params.ImagesFolderPath, imageName)
+	imageName := GetImageNameFromUrl(fullUrl)
+	imagePath := GetValidPath(params.ImagesFolderPath, imageName)
 
 	if _, err := os.Stat(imagePath); err == nil {
 		return imageName, nil
@@ -48,20 +50,20 @@ func downloadImageIfNeed(url string, params *ParserParams) (string, error) {
 	return imageName, nil
 }
 
-func getImageNameFromUrl(url string) string {
+func GetImageNameFromUrl(url string) string {
 	split := strings.Split(url, "/")
 	return split[len(split)-1]
 }
 
-func getValidLink(link string) (string, error) {
+func GetValidLink(link string, base url.URL) (string, error) {
 	linkUrl, err := url.Parse(link)
 	if err != nil {
 		return "", err
 	}
-	return baseUp18Url.ResolveReference(linkUrl).String(), nil
+	return base.ResolveReference(linkUrl).String(), nil
 }
 
-func createAndGetFile(path string, flag int) (*os.File, error) {
+func CreateAndGetFile(path string, flag int) (*os.File, error) {
 	validPath := path
 	return os.OpenFile(validPath, flag|os.O_CREATE, 0777)
 }

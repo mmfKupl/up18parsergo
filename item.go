@@ -1,4 +1,4 @@
-package main
+package parser
 
 import (
 	"encoding/json"
@@ -7,24 +7,16 @@ import (
 	"os"
 )
 
-type Item struct {
-	Artikul   string `json:"artikul"`
-	Image     string `json:"image"`
-	ItemTitle string `json:"itemTitle"`
-	LinkTo    string `json:"linkTo"`
-	Price     string `json:"price"`
-}
-
 const (
 	startFileLength = len("{\n  \"mappedParsedData\": [\n")
 	endFileLength   = len("\n  ]\n}")
 )
 
-func appendItemToFile(item *Item, file *os.File) error {
-	items := make([]*Item, 1)
+func AppendItemToFile(item Item, file *os.File) error {
+	items := make([]Item, 1)
 	items[0] = item
 
-	itemsMap := map[string][]*Item{
+	itemsMap := map[string][]Item{
 		"mappedParsedData": items,
 	}
 
@@ -49,23 +41,23 @@ func appendItemToFile(item *Item, file *os.File) error {
 	return err
 }
 
-func appendUnparsedItemToFile(item *Item) {
-	filePath := getValidPath("__crushed-items.json")
-	file, err := createAndGetFile(filePath, os.O_WRONLY)
+func AppendUnparsedItemToFile(item Item) {
+	filePath := GetValidPath("__crushed-items.json")
+	file, err := CreateAndGetFile(filePath, os.O_WRONLY)
 	if err != nil {
 		fmt.Printf("Не удалось открыть новый файл.\n")
 		return
 	}
 
-	err = appendItemToFile(item, file)
+	err = AppendItemToFile(item, file)
 	if err != nil {
-		fmt.Printf("Не удалось записать неудавшиеся данные в новый файл: %s, %s: %s\n", item.Artikul, item.LinkTo, err)
+		fmt.Printf("Не удалось записать неудавшиеся данные в новый файл: %s, %s: %s\n", item.GetId(), item.GetLink(), err)
 	}
 }
 
-func writeCrushedUrlToFile(url string) {
-	filePath := getValidPath("__crushed-urls.json")
-	file, err := createAndGetFile(filePath, os.O_RDWR)
+func WriteCrushedUrlToFile(url string) {
+	filePath := GetValidPath("__crushed-urls.json")
+	file, err := CreateAndGetFile(filePath, os.O_RDWR)
 	if err != nil {
 		fmt.Printf("Не удалось открыть файл с незагруженными ссылками: %s.\n", err)
 		return

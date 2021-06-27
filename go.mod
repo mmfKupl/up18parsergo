@@ -1,4 +1,4 @@
-module up18parser
+module sitesParsers
 
 go 1.16
 
