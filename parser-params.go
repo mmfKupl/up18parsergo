@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -12,6 +13,8 @@ var baseUp18Url = url.URL{
 }
 
 const (
+	baseFolderToSave = "data"
+
 	urlsToParsePathArg        = "--urlsToParse="
 	urlsToParsePathArg__short = "--utp="
 
@@ -41,7 +44,7 @@ func NewParserParams() *ParserParams {
 		UrlToParse:       "https://up18.by/brends/toya/",
 		ImagesFolderPath: "files",
 		DataFilePath:     "data.json",
-		WithoutImages:    true,
+		WithoutImages:    false,
 	}
 }
 
@@ -86,17 +89,28 @@ func parseArgument(argument string) (string, string) {
 
 func initParser(params *ParserParams) error {
 
-	if _, err := os.Stat(params.ImagesFolderPath); os.IsNotExist(err) {
-		err = os.Mkdir(params.ImagesFolderPath, 0777)
+	if _, err := os.Stat(baseFolderToSave); os.IsNotExist(err) {
+		err = os.Mkdir(baseFolderToSave, 0777)
 		if err != nil {
-			return err
+			return fmt.Errorf("неудалось создать базовую папку `%s`: %s", baseFolderToSave, err)
 		}
 	}
 
-	if _, err := os.Stat(params.DataFilePath); os.IsNotExist(err) {
-		_, err = os.Create(params.DataFilePath)
+	folderPath := getValidPath(params.ImagesFolderPath)
+
+	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
+		err = os.Mkdir(folderPath, 0777)
 		if err != nil {
-			return err
+			return fmt.Errorf("неудалось создать папку с картинками `%s`: %s", folderPath, err)
+		}
+	}
+
+	dataFilePath := getValidPath(params.DataFilePath)
+
+	if _, err := os.Stat(dataFilePath); os.IsNotExist(err) {
+		_, err = os.Create(dataFilePath)
+		if err != nil {
+			return fmt.Errorf("неудалось создать файл с данными `%s`: %s", dataFilePath, err)
 		}
 	}
 

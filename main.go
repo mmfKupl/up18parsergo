@@ -2,97 +2,124 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"strings"
+	"sync"
+
+	"github.com/gocolly/colly/v2"
 )
 
 func main() {
+	defer fmt.Println("Конец.")
 	parserParams := initParserParams()
 	err := initParser(parserParams)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fileName, err := downloadImageIfNeed("https://up18.by/images/new_product/Fein/71293362000.jpg", parserParams)
+
+	c := colly.NewCollector(colly.AllowedDomains(baseUp18Url.Host), colly.Async(true))
+
+	itemsToSaveChan := make(chan *Item)
+	var wg sync.WaitGroup
+
+	err = listenItemsAndSaveToFile(itemsToSaveChan, parserParams, &wg)
 	if err != nil {
-		fmt.Println("Image downloading failed")
+		fmt.Printf("Не удалось установить соединение с файлом: %s\n", err)
+		os.Exit(1)
 	}
-	fmt.Println("fileName - " + fileName)
-	// url := "https://up18.by/brends/makita"
-	//
-	// c := colly.NewCollector(colly.AllowedDomains("up18.by"))
-	//
-	// c.OnHTML(".pagination span + a", func(e *colly.HTMLElement) {
-	// 	fmt.Println(e.Text)
-	// 	fmt.Println(e.Attr("href"))
-	// 	c.Visit(e.Attr("href"))
-	// })
-	//
-	// c.OnRequest(func(r *colly.Request) {
-	// 	fmt.Printf("Visit %s\n", r.URL.String())
-	// })
-	//
-	// c.OnResponse(func(r *colly.Response) {
-	// 	fmt.Printf("Responce %+v", r.StatusCode)
-	// })
-	//
-	// err := c.Visit(url)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	//
-	// c.Wait()
-	// fmt.Println("End.")
+	findNewPageAndVisitIt(c)
+	logPageVisiting(c)
+	findAndParseItemsOnPage(c, parserParams, itemsToSaveChan, &wg)
+
+	err = c.Visit(parserParams.UrlToParse)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	c.Wait()
+	close(itemsToSaveChan)
+	wg.Wait()
 }
 
-func downloadImageIfNeed(url string, params *ParserParams) (string, error) {
+func findAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- *Item, wg *sync.WaitGroup) {
+	c.OnHTML(".itemList .item", func(e *colly.HTMLElement) {
+		price := strings.ReplaceAll(e.ChildText("[itemProp=\"price\"]"), " ", "")
+		artikul := strings.TrimSpace(e.ChildText(".itemArt span"))
+		itemTitle := strings.TrimSpace(e.ChildText(".itemTitle span"))
+		href := e.ChildAttr(".itemTitle a", "href")
+		linkTo, err := getValidLink(href)
+		if err != nil {
+			linkTo = href
+		}
 
-	fullUrl, err := getValidLink(url)
-	if err != nil {
-		return "", err
-	}
-	imageName := getImageNameFromUrl(fullUrl)
-	imagePath := path.Join(params.ImagesFolderPath, imageName)
+		imageLink := e.ChildAttr("img", "src")
+		image := imageLink
+		if !params.WithoutImages {
+			image, err = downloadImageIfNeed(imageLink, params)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if strings.HasSuffix(image, "nofoto.jpg") {
+				image = ""
+			}
+		}
 
-	if _, err := os.Stat(imagePath); err == nil {
-		fmt.Println("FileExist")
-		return imageName, nil
-	}
-	fmt.Println("File Not Exist")
+		item := &Item{
+			Price:     price,
+			Artikul:   artikul,
+			ItemTitle: itemTitle,
+			LinkTo:    linkTo,
+			Image:     image,
+		}
 
-	res, err := http.Get(fullUrl)
-	if err != nil {
-		return fullUrl, err
-	}
-	defer res.Body.Close()
-
-	file, err := os.Create(imagePath)
-	if err != nil {
-		return fullUrl, err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, res.Body)
-	if err != nil {
-		return fullUrl, err
-	}
-
-	return imageName, nil
+		wg.Add(1)
+		itemsToSaveChan <- item
+	})
 }
 
-func getImageNameFromUrl(url string) string {
-	split := strings.Split(url, "/")
-	return split[len(split)-1]
+func listenItemsAndSaveToFile(itemsToSaveChan <-chan *Item, params *ParserParams, wg *sync.WaitGroup) error {
+	filePath := getValidPath(params.DataFilePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+	go func() {
+		for item := range itemsToSaveChan {
+			err := appendItemToFile(item, file)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.Artikul, item.LinkTo, err)
+				appendUnparsedItemToFile(item)
+			}
+			wg.Done()
+		}
+		wg.Done()
+		file.Close()
+	}()
+
+	return nil
 }
 
-func getValidLink(link string) (string, error) {
-	linkUrl, err := url.Parse(link)
-	if err != nil {
-		return "", err
-	}
-	return baseUp18Url.ResolveReference(linkUrl).String(), nil
+func findNewPageAndVisitIt(c *colly.Collector) {
+	c.OnHTML(".pagination span + a", func(e *colly.HTMLElement) {
+		href := e.Attr("href")
+		validUrl, err := getValidLink(href)
+		if err != nil {
+			fmt.Printf("Неудалось получить правильную ссылку для `%s`: %s\n", href, err)
+			validUrl = href
+		}
+		err = c.Visit(validUrl)
+		if err != nil {
+			fmt.Printf("Неудалось посетить следующую страницу `%s`: %s\n", validUrl, err)
+			writeCrushedUrlToFile(validUrl)
+		}
+	})
+}
+
+func logPageVisiting(c *colly.Collector) {
+	c.OnRequest(func(r *colly.Request) {
+		fmt.Printf("Парсим следующую страницу - %s\n", r.URL.String())
+	})
 }
