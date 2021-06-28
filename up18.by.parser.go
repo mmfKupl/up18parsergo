@@ -28,7 +28,7 @@ func StartUp18Parser(parserParams *ParserParams) {
 	}
 	findNewPageAndVisitIt(c)
 	logPageVisiting(c)
-	FindAndParseItemsOnPage(c, parserParams, itemsToSaveChan, &wg)
+	findAndParseItemsOnPage(c, parserParams, itemsToSaveChan, &wg)
 
 	err = c.Visit(parserParams.UrlToParse)
 	if err != nil {
@@ -40,7 +40,7 @@ func StartUp18Parser(parserParams *ParserParams) {
 	wg.Wait()
 }
 
-func FindAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
+func findAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
 	c.OnHTML(".itemList .item", func(e *colly.HTMLElement) {
 		price := strings.ReplaceAll(e.ChildText("[itemProp=\"price\"]"), " ", "")
 		artikul := strings.TrimSpace(e.ChildText(".itemArt span"))

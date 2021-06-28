@@ -31,3 +31,20 @@ func (ii *InternalItem) GetLink() string {
 func (ii *InternalItem) GetId() string {
 	return ii.Artikul
 }
+
+type ExternalItem struct {
+	Articul       string `json:"articul"`
+	Description   string `json:"description"`
+	Image         string `json:"image"`
+	LinkTo        string `json:"linkTo"`
+	Name          string `json:"name"`
+	TechnicalAttr string `json:"technical-attr"`
+}
+
+func (ii *ExternalItem) GetLink() string {
+	return ii.LinkTo
+}
+
+func (ii *ExternalItem) GetId() string {
+	return ii.Articul
+}

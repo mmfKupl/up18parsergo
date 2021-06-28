@@ -1,5 +1,194 @@
 package parser
 
-func StartDewaltParser(params *ParserParams) {
+import (
+	"fmt"
+	"net/url"
+	"os"
+	"strings"
+	"sync"
 
+	"github.com/gocolly/colly/v2"
+	"github.com/microcosm-cc/bluemonday"
+)
+
+var baseDewaltUrl = url.URL{
+	Scheme: "https",
+	Host:   "shop.dewalt.ru",
+}
+
+var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a")
+
+func StartDewaltParser(parserParams *ParserParams) {
+	c := colly.NewCollector(colly.AllowedDomains(baseDewaltUrl.Host), colly.Async(true))
+
+	itemsToSaveChan := make(chan Item)
+	var wg sync.WaitGroup
+
+	err := listenItemsAndSaveToFile_dw(itemsToSaveChan, parserParams, &wg)
+	if err != nil {
+		fmt.Printf("Не удалось установить соединение с файлом: %s\n", err)
+		os.Exit(1)
+	}
+
+	findNewPageAndVisitIt_dw(c)
+	logPageVisiting_dw(c)
+	findAndParseItemsOnPage_dw(c, parserParams, itemsToSaveChan, &wg)
+
+	err = c.Visit(parserParams.UrlToParse)
+	if err != nil {
+		fmt.Printf("Не удалось открыть начальную страницу %s: %s\n.", parserParams.UrlToParse, err)
+	}
+
+	c.Wait()
+	close(itemsToSaveChan)
+	wg.Wait()
+}
+
+func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
+	c.OnHTML(".main > .category-wrapper > .category-products .product-cont .product-item__side .product-item__image-section > a", func(e *colly.HTMLElement) {
+		href := e.Attr("href")
+		linkTo, err := GetValidLink(href, baseDewaltUrl)
+		if err != nil {
+			linkTo = href
+		}
+
+		err = c.Visit(linkTo)
+		if err != nil {
+			fmt.Printf("Не удалось открыть страницу с товаром %s: %s\n.", linkTo, err)
+		}
+	})
+
+	c.OnHTML(".page-wrapper > .main-container > .container > .main", func(e *colly.HTMLElement) {
+		if e.DOM.Parent().Find(".main > .h1_category-title").Length() != 0 {
+			// skip non item pages
+			return
+		}
+
+		articul := strings.TrimSpace(e.ChildText(".product-card .product-card__sku span"))
+		href := e.Request.URL.String()
+		linkTo, err := GetValidLink(href, baseDewaltUrl)
+		if err != nil {
+			linkTo = href
+		}
+
+		descriptionText := e.ChildText(".description__info-text")
+		description := ""
+		descriptionElement := e.DOM.Find(".description__info-text")
+		if descriptionElement == nil {
+			description = descriptionText
+		} else {
+			description = descriptionElement.Text()
+			if err != nil {
+				fmt.Printf("Не получилось получить описание элемента %s в формате html (%s).\n", articul, linkTo)
+				description = descriptionText
+			}
+		}
+
+		technicalAttrText := e.ChildText(".product-view__attributes")
+		technicalAttr := ""
+		technicalAttrElement := e.DOM.Find(".product-view__attributes")
+		if technicalAttrElement == nil {
+			description = descriptionText
+		} else {
+			technicalAttr, err = technicalAttrElement.Html()
+			if err != nil {
+				fmt.Printf("Не получилось получить технические атрибуты элемента %s в формате html (%s).\n", articul, linkTo)
+				description = technicalAttrText
+			}
+		}
+
+		name := strings.TrimSpace(e.ChildText(".product-card .product-card__title"))
+
+		imageLink := e.ChildAttr(".product-card .swiper-slide-active > .images-gallery__image", "src")
+		image := imageLink
+		if !params.WithoutImages {
+			image, err = DownloadImageIfNeed(imageLink, params, baseDewaltUrl)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if strings.HasSuffix(image, "nofoto.jpg") {
+				image = ""
+			}
+		}
+
+		item := &ExternalItem{
+			Articul:       articul,
+			Description:   sanitizer.Sanitize(description),
+			Image:         image,
+			LinkTo:        linkTo,
+			Name:          name,
+			TechnicalAttr: sanitizer.Sanitize(technicalAttr),
+		}
+
+		wg.Add(1)
+		itemsToSaveChan <- item
+	})
+}
+
+func listenItemsAndSaveToFile_dw(itemsToSaveChan <-chan Item, params *ParserParams, wg *sync.WaitGroup) error {
+	filePath := GetValidPath(params.DataFilePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+	go func() {
+		for item := range itemsToSaveChan {
+			err := AppendItemToFile(item, file)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
+				AppendUnparsedItemToFile(item)
+			}
+			wg.Done()
+		}
+		wg.Done()
+		file.Close()
+	}()
+
+	return nil
+}
+
+func findNewPageAndVisitIt_dw(c *colly.Collector) {
+	c.OnHTML(".toolbar-pages__list", func(e *colly.HTMLElement) {
+		var activeElement *colly.HTMLElement
+		var activeElementIndex int
+
+		var nextPageElement *colly.HTMLElement
+
+		e.ForEach(".toolbar-pages__link", func(i int, element *colly.HTMLElement) {
+			if element.DOM.Is(".toolbar-pages__link_active") {
+				activeElement = element
+				activeElementIndex = i
+				return
+			}
+
+			if activeElement != nil && activeElementIndex == i-1 {
+				nextPageElement = element
+			}
+		})
+
+		if nextPageElement == nil {
+			fmt.Printf("Неудалось найти следующую страницу: %#v\n", e.DOM)
+			return
+		}
+
+		href := nextPageElement.Attr("href")
+		validUrl, err := GetValidLink(href, baseDewaltUrl)
+		if err != nil {
+			fmt.Printf("Неудалось получить правильную ссылку для `%s`: %s\n", href, err)
+			validUrl = href
+		}
+		err = c.Visit(validUrl)
+		if err != nil {
+			fmt.Printf("Неудалось посетить следующую страницу `%s`: %s\n", validUrl, err)
+			WriteCrushedUrlToFile(validUrl)
+		}
+	})
+}
+
+func logPageVisiting_dw(c *colly.Collector) {
+	c.OnRequest(func(r *colly.Request) {
+		fmt.Printf("Парсим следующую страницу - %s\n", r.URL.String())
+	})
 }
