@@ -99,15 +99,12 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 
 		name := strings.TrimSpace(e.ChildText(".product-card .product-card__title"))
 
-		imageLink := e.ChildAttr(".product-card .swiper-slide-active > .images-gallery__image", "src")
+		imageLink := e.ChildAttr(".images-gallery__items .images-gallery__slide", "data-src")
 		image := imageLink
-		if !params.WithoutImages {
+		if !params.WithoutImages && imageLink != "" {
 			image, err = DownloadImageIfNeed(imageLink, params, baseDewaltUrl)
 			if err != nil {
 				fmt.Println(err)
-			}
-			if strings.HasSuffix(image, "nofoto.jpg") {
-				image = ""
 			}
 		}
 
