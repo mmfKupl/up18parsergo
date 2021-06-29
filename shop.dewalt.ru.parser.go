@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/microcosm-cc/bluemonday"
 )
@@ -88,12 +89,20 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 		technicalAttr := ""
 		technicalAttrElement := e.DOM.Find(".product-view__attributes")
 		if technicalAttrElement == nil {
-			description = descriptionText
+			technicalAttr = technicalAttrText
 		} else {
+
+			technicalAttrElement.Find(".product-view__attribute-title").Each(func(_ int, selection *goquery.Selection) {
+				text := selection.Text()
+				if text == "Дополнительная информация" {
+					selection.Parent().Remove()
+				}
+			})
+
 			technicalAttr, err = technicalAttrElement.Html()
 			if err != nil {
 				fmt.Printf("Не получилось получить технические атрибуты элемента %s в формате html (%s).\n", articul, linkTo)
-				description = technicalAttrText
+				technicalAttr = technicalAttrText
 			}
 		}
 

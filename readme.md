@@ -1,7 +1,7 @@
 #Билд исходников
 
 ```
-GOOS=windows GOARCH=386 go build
+GOOS=windows GOARCH=386 go build .
 ```
 
 #Как пользоваться
