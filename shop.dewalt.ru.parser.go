@@ -17,7 +17,7 @@ var baseDewaltUrl = url.URL{
 	Host:   "shop.dewalt.ru",
 }
 
-var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a")
+var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a").AllowAttrs("class").Globally()
 
 func StartDewaltParser(parserParams *ParserParams) {
 	c := colly.NewCollector(colly.AllowedDomains(baseDewaltUrl.Host), colly.Async(true))
