@@ -125,7 +125,8 @@ func initParserParams(parentParserMode Mode) *ParserParams {
 }
 
 func initParser(params *ParserParams) error {
-	if params.UrlToParse == "" && params.UrlsToParsePath == "" {
+	// TODO: add using of UrlsToParsePath
+	if params.UrlToParse == "" /*&& params.UrlsToParsePath == ""*/ {
 		return fmt.Errorf("Не заданы ссылки для скачивания. (за информацией запустите программу с флагом -h. и прочитайте про флаги  -url и -utp). ")
 	}
 

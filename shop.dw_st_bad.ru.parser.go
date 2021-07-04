@@ -17,15 +17,39 @@ var baseDewaltUrl = url.URL{
 	Host:   "shop.dewalt.ru",
 }
 
-var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a").AllowAttrs("class").Globally()
+var baseStanlyUrl = url.URL{
+	Scheme: "https",
+	Host:   "shop.stanley.ru",
+}
 
-func StartDewaltParser(parserParams *ParserParams) {
-	c := colly.NewCollector(colly.AllowedDomains(baseDewaltUrl.Host), colly.Async(true))
+var baseBlackAndDeckertUrl = url.URL{
+	Scheme: "https",
+	Host:   "shop.blackanddecker.ru",
+}
+
+var baseUrl url.URL
+
+var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a")
+
+func StartDW_ST_BADParser(parserParams *ParserParams) {
+	parsedBaseUrl, err := url.Parse(parserParams.UrlToParse)
+	if err != nil {
+		fmt.Printf("Не удалось определить базовый урл для сайта %s: %s\n", parserParams.UrlToParse, err)
+		os.Exit(1)
+	}
+
+	if parsedBaseUrl.Host != baseDewaltUrl.Host && parsedBaseUrl.Host != baseStanlyUrl.Host && parsedBaseUrl.Host != baseBlackAndDeckertUrl.Host {
+		fmt.Printf("Передана невалидная ссылка на сайт - %s, используйте ссылки со следующих сайтов - %s, %s, %s\n", parserParams.UrlToParse, baseDewaltUrl.String(), baseStanlyUrl.String(), baseBlackAndDeckertUrl.String())
+		os.Exit(1)
+	}
+	baseUrl = *parsedBaseUrl
+
+	c := colly.NewCollector(colly.AllowedDomains(baseUrl.Host), colly.Async(true))
 
 	itemsToSaveChan := make(chan Item)
 	var wg sync.WaitGroup
 
-	err := listenItemsAndSaveToFile_dw(itemsToSaveChan, parserParams, &wg)
+	err = listenItemsAndSaveToFile_dw(itemsToSaveChan, parserParams, &wg)
 	if err != nil {
 		fmt.Printf("Не удалось установить соединение с файлом: %s\n", err)
 		os.Exit(1)
@@ -48,7 +72,7 @@ func StartDewaltParser(parserParams *ParserParams) {
 func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
 	c.OnHTML(".main > .category-wrapper > .category-products .product-cont .product-item__side .product-item__image-section > a", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
-		linkTo, err := GetValidLink(href, baseDewaltUrl)
+		linkTo, err := GetValidLink(href, baseUrl)
 		if err != nil {
 			linkTo = href
 		}
@@ -67,7 +91,7 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 
 		articul := strings.TrimSpace(e.ChildText(".product-card .product-card__sku span"))
 		href := e.Request.URL.String()
-		linkTo, err := GetValidLink(href, baseDewaltUrl)
+		linkTo, err := GetValidLink(href, baseUrl)
 		if err != nil {
 			linkTo = href
 		}
@@ -78,7 +102,7 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 		if descriptionElement == nil {
 			description = descriptionText
 		} else {
-			description = descriptionElement.Text()
+			description, err = descriptionElement.Html()
 			if err != nil {
 				fmt.Printf("Не получилось получить описание элемента %s в формате html (%s).\n", articul, linkTo)
 				description = descriptionText
@@ -111,11 +135,13 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 		imageLink := e.ChildAttr(".images-gallery__items .images-gallery__slide", "data-src")
 		image := imageLink
 		if !params.WithoutImages && imageLink != "" {
-			image, err = DownloadImageIfNeed(imageLink, params, baseDewaltUrl)
+			image, err = DownloadImageIfNeed(imageLink, params, baseUrl)
 			if err != nil {
 				fmt.Println(err)
 			}
 		}
+
+		technicalAttr = fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.Sanitize(technicalAttr))
 
 		item := &ExternalItem{
 			Articul:       articul,
@@ -123,7 +149,7 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 			Image:         image,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: sanitizer.Sanitize(technicalAttr),
+			TechnicalAttr: technicalAttr,
 		}
 
 		wg.Add(1)
@@ -180,7 +206,7 @@ func findNewPageAndVisitIt_dw(c *colly.Collector) {
 		}
 
 		href := nextPageElement.Attr("href")
-		validUrl, err := GetValidLink(href, baseDewaltUrl)
+		validUrl, err := GetValidLink(href, baseUrl)
 		if err != nil {
 			fmt.Printf("Неудалось получить правильную ссылку для `%s`: %s\n", href, err)
 			validUrl = href

@@ -19,6 +19,6 @@ func StartParser(parserMode Mode) {
 	case InternalParserMode:
 		StartUp18Parser(parserParams)
 	case ExternalParserMode:
-		StartDewaltParser(parserParams)
+		StartDW_ST_BADParser(parserParams)
 	}
 }

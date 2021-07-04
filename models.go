@@ -9,6 +9,7 @@ type Item interface {
 
 type ParserParams struct {
 	ParserMode       Mode
+	baseURLName      string
 	UrlsToParsePath  string
 	UrlToParse       string
 	ImagesFolderPath string
