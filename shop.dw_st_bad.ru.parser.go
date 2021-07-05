@@ -70,7 +70,7 @@ func StartDW_ST_BADParser(parserParams *ParserParams) {
 }
 
 func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
-	c.OnHTML(".main > .category-wrapper > .category-products .product-cont .product-item__side .product-item__image-section > a", func(e *colly.HTMLElement) {
+	parseItemFn := func(e *colly.HTMLElement) {
 		href := e.Attr("href")
 		linkTo, err := GetValidLink(href, baseUrl)
 		if err != nil {
@@ -81,7 +81,11 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 		if err != nil {
 			fmt.Printf("Не удалось открыть страницу с товаром %s: %s\n.", linkTo, err)
 		}
-	})
+	}
+	// for simple pages
+	c.OnHTML(".main > .category-wrapper > .category-products .product-cont .product-item__side .product-item__image-section > a", parseItemFn)
+	// for promo pages like https://shop.stanley.ru/fatmaxtools.html
+	c.OnHTML(".main > .promo-wrap > .category-wrapper > .category-products .product-cont .product-item__side .product-item__image-section > a", parseItemFn)
 
 	c.OnHTML(".page-wrapper > .main-container > .container > .main", func(e *colly.HTMLElement) {
 		if e.DOM.Parent().Find(".main > .h1_category-title").Length() != 0 {
@@ -201,7 +205,12 @@ func findNewPageAndVisitIt_dw(c *colly.Collector) {
 		})
 
 		if nextPageElement == nil {
-			fmt.Printf("Неудалось найти следующую страницу: %#v\n", e.DOM)
+			htmlPageItem, err := e.DOM.Html()
+			if err != nil {
+				fmt.Printf("Неудалось найти следующую страницу: %#v\n", e)
+				return
+			}
+			fmt.Printf("Неудалось найти следующую страницу: %#v\n", htmlPageItem)
 			return
 		}
 
