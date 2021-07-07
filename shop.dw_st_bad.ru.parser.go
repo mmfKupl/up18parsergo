@@ -122,7 +122,7 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 
 			technicalAttrElement.Find(".product-view__attribute-title").Each(func(_ int, selection *goquery.Selection) {
 				text := selection.Text()
-				if text == "Дополнительная информация" {
+				if text == "Дополнительная информация" || text == "Гарантия" {
 					selection.Parent().Remove()
 				}
 			})
