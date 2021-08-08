@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/gocolly/colly/v2"
 )
 
 const BaseFolderToSave = "data"
@@ -63,7 +65,24 @@ func GetValidLink(link string, base url.URL) (string, error) {
 	return base.ResolveReference(linkUrl).String(), nil
 }
 
+func GetValidLinkOr(link string, base url.URL, or string) string {
+	validLink, err := GetValidLink(link, base)
+	if err != nil {
+		return or
+	}
+	return validLink
+}
+
 func CreateAndGetFile(path string, flag int) (*os.File, error) {
 	validPath := path
 	return os.OpenFile(validPath, flag|os.O_CREATE, 0777)
+}
+
+func LogPageVisiting(c *colly.Collector) {
+	c.OnError(func(response *colly.Response, err error) {
+		fmt.Printf("Ошибка запроса на страницу %s: %s\n", response.Request.URL.String(), err)
+	})
+	c.OnRequest(func(r *colly.Request) {
+		fmt.Printf("Парсим следующую страницу - %s\n", r.URL.String())
+	})
 }

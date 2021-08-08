@@ -3,5 +3,5 @@ package main
 import parser "sitesParsers"
 
 func main() {
-	parser.StartParser(parser.InternalParserMode)
+	parser.StartParser(parser.InternalParserMode, "")
 }

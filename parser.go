@@ -3,9 +3,13 @@ package parser
 import (
 	"fmt"
 	"os"
+
+	"github.com/microcosm-cc/bluemonday"
 )
 
-func StartParser(parserMode Mode) {
+var sanitizer = bluemonday.UGCPolicy().SkipElementsContent("a")
+
+func StartParser(parserMode Mode, externalType string) {
 	defer fmt.Println("Конец.")
 	parserParams := initParserParams(parserMode)
 	err := initParser(parserParams)
@@ -19,6 +23,11 @@ func StartParser(parserMode Mode) {
 	case InternalParserMode:
 		StartUp18Parser(parserParams)
 	case ExternalParserMode:
-		StartDW_ST_BADParser(parserParams)
+		switch externalType {
+		case "makita.ru":
+			StartMakitaParser(parserParams)
+		default:
+			StartDW_ST_BADParser(parserParams)
+		}
 	}
 }

@@ -21,13 +21,13 @@ func StartUp18Parser(parserParams *ParserParams) {
 	itemsToSaveChan := make(chan Item)
 	var wg sync.WaitGroup
 
-	err := listenItemsAndSaveToFile(itemsToSaveChan, parserParams, &wg)
+	err := ListenInternalItemsAndSaveToFile(itemsToSaveChan, parserParams, &wg)
 	if err != nil {
 		fmt.Printf("Не удалось установить соединение с файлом: %s\n", err)
 		os.Exit(1)
 	}
 	findNewPageAndVisitIt(c)
-	logPageVisiting(c)
+	LogPageVisiting(c)
 	findAndParseItemsOnPage(c, parserParams, itemsToSaveChan, &wg)
 
 	err = c.Visit(parserParams.UrlToParse)
@@ -42,14 +42,13 @@ func StartUp18Parser(parserParams *ParserParams) {
 
 func findAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- Item, wg *sync.WaitGroup) {
 	c.OnHTML(".itemList .item", func(e *colly.HTMLElement) {
+		var err error
+
 		price := strings.ReplaceAll(e.ChildText("[itemProp=\"price\"]"), " ", "")
 		artikul := strings.TrimSpace(e.ChildText(".itemArt span"))
 		itemTitle := strings.TrimSpace(e.ChildText(".itemTitle span"))
 		href := e.ChildAttr(".itemTitle a", "href")
-		linkTo, err := GetValidLink(href, baseUp18Url)
-		if err != nil {
-			linkTo = href
-		}
+		linkTo := GetValidLinkOr(href, baseUp18Url, href)
 
 		imageLink := e.ChildAttr("img", "src")
 		image := imageLink
@@ -76,30 +75,6 @@ func findAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSa
 	})
 }
 
-func listenItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *ParserParams, wg *sync.WaitGroup) error {
-	filePath := GetValidPath(params.DataFilePath)
-	file, err := os.OpenFile(filePath, os.O_WRONLY, 0777)
-	if err != nil {
-		return err
-	}
-
-	wg.Add(1)
-	go func() {
-		for item := range itemsToSaveChan {
-			err := AppendItemToFile(item, file)
-			if err != nil {
-				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
-				AppendUnparsedItemToFile(item)
-			}
-			wg.Done()
-		}
-		wg.Done()
-		file.Close()
-	}()
-
-	return nil
-}
-
 func findNewPageAndVisitIt(c *colly.Collector) {
 	c.OnHTML(".pagination span + a", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
@@ -113,11 +88,5 @@ func findNewPageAndVisitIt(c *colly.Collector) {
 			fmt.Printf("Неудалось посетить следующую страницу `%s`: %s\n", validUrl, err)
 			WriteCrushedUrlToFile(validUrl)
 		}
-	})
-}
-
-func logPageVisiting(c *colly.Collector) {
-	c.OnRequest(func(r *colly.Request) {
-		fmt.Printf("Парсим следующую страницу - %s\n", r.URL.String())
 	})
 }

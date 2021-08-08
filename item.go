@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
 const (
@@ -108,4 +109,53 @@ func WriteCrushedUrlToFile(url string) {
 		fmt.Printf("Не удалось сохранить в файл незагруженные ссылки: %s.\n", err)
 		return
 	}
+}
+
+func ListenExternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *ParserParams, wg *sync.WaitGroup) error {
+	filePath := GetValidPath(params.DataFilePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+	go func() {
+		for item := range itemsToSaveChan {
+			err := AppendItemToFile(item, file)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
+				AppendUnparsedItemToFile(item)
+			}
+			fmt.Printf("Сохранен элемент %s, %s\n", item.GetId(), item.GetLink())
+			wg.Done()
+		}
+		file.Close()
+		wg.Done()
+	}()
+
+	return nil
+}
+
+func ListenInternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *ParserParams, wg *sync.WaitGroup) error {
+	filePath := GetValidPath(params.DataFilePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+	go func() {
+		for item := range itemsToSaveChan {
+			err := AppendItemToFile(item, file)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
+				AppendUnparsedItemToFile(item)
+			}
+			wg.Done()
+		}
+		wg.Done()
+		file.Close()
+	}()
+
+	return nil
 }
