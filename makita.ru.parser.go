@@ -85,6 +85,7 @@ func StartMakitaParser(parserParams *ParserParams) {
 	}
 
 	c.Wait()
+	tempPageToVisitChan <- rxgo.Item{}
 	close(itemsToSaveChan)
 	wg.Wait()
 }
@@ -144,7 +145,7 @@ func findItemsAndVisitIt(c *colly.Collector, pageChan chan<- rxgo.Item) {
 					numberParam = 1
 				}
 				numberParam++
-				urlQuery.Add(paginatorUrlParamName, fmt.Sprintf("%v", numberParam))
+				urlQuery.Set(paginatorUrlParamName, fmt.Sprintf("%v", numberParam))
 
 				validCurrentUrl.RawQuery = urlQuery.Encode()
 				stringUrlToVisit := validCurrentUrl.String()
@@ -210,13 +211,21 @@ func parseItemPage_mk(c *colly.Collector, params *ParserParams, itemsToSaveChan 
 
 		item := &ExternalItem{
 			Articul:       articul,
-			Description:   mkSanitizer.Sanitize(description),
+			Description:   RemoveAllEnters(mkSanitizer.Sanitize(description)),
 			Image:         image,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: fmt.Sprintf("<div class=\"dw-pars\">%s</div>", mkSanitizer.Sanitize(technicalAttr)),
+			TechnicalAttr: RemoveAllEnters(fmt.Sprintf("<div class=\"dw-pars\">%s</div>", mkSanitizer.Sanitize(technicalAttr))),
 		}
 
 		itemsToSaveChan <- rxgo.Item{V: item}
 	})
+}
+
+func RemoveAllEnters(s string) string {
+	return strings.ReplaceAll(
+		strings.TrimSpace(s),
+		"\n",
+		"",
+	)
 }
