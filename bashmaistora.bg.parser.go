@@ -90,6 +90,7 @@ func findItemsAndVisitItBash(c *colly.Collector, pageChan chan<- rxgo.Item) {
 	c.OnHTML("main#content .two_cols_page .right_content", func(e *colly.HTMLElement) {
 		visitPage := func(s *goquery.Selection, isItem bool) {
 			href, _ := s.Attr("href")
+			href = strings.TrimSpace(href)
 			linkTo := GetValidLinkOr(href, baseBashmaistoraUrl, href)
 
 			if isItem {
