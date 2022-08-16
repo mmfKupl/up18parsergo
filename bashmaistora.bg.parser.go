@@ -165,6 +165,7 @@ func parseItemPage_bsh(c *colly.Collector, params *ParserParams, itemsToSaveChan
 
 		articul := strings.TrimSpace(e.ChildText(".middle_part .small_info.left + .left.w100 > .small_info.left"))
 		articul = strings.ReplaceAll(articul, "Кат. номер: ", "")
+		articul = strings.ReplaceAll(articul, " ", "")
 		articul = strings.TrimSpace(articul)
 
 		href := e.Request.URL.String()
