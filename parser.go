@@ -28,6 +28,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartMakitaParser(parserParams)
 		case "bashmaistora.bg":
 			StartBashmaistoraParser(parserParams)
+		case "japan-ukraine.com":
+			JapanUkraineParser(parserParams)
 		default:
 			StartDW_ST_BADParser(parserParams)
 		}

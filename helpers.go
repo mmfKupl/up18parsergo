@@ -20,12 +20,20 @@ func GetValidPath(elem ...string) string {
 }
 
 func DownloadImageIfNeed(url string, params *ParserParams, base url.URL) (string, error) {
+	return DownloadNamedImageIfNeed(url, params, base, "")
+}
 
+func DownloadNamedImageIfNeed(url string, params *ParserParams, base url.URL, imageName string) (string, error) {
 	fullUrl, err := GetValidLink(url, base)
 	if err != nil {
 		return "", err
 	}
-	imageName := GetImageNameFromUrl(fullUrl)
+	if imageName == "" {
+		imageName = GetImageNameFromUrl(fullUrl)
+	} else {
+		fileType := GetImageType(fullUrl)
+		imageName += "." + fileType
+	}
 	imagePath := GetValidPath(params.ImagesFolderPath, imageName)
 
 	if _, err := os.Stat(imagePath); err == nil {
@@ -54,6 +62,11 @@ func DownloadImageIfNeed(url string, params *ParserParams, base url.URL) (string
 
 func GetImageNameFromUrl(url string) string {
 	split := strings.Split(url, "/")
+	return split[len(split)-1]
+}
+
+func GetImageType(path string) string {
+	split := strings.Split(path, ".")
 	return split[len(split)-1]
 }
 
