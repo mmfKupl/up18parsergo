@@ -44,7 +44,7 @@ func findAndParseItemsOnPage(c *colly.Collector, params *ParserParams, itemsToSa
 	c.OnHTML(".itemList .item", func(e *colly.HTMLElement) {
 		var err error
 
-		price := strings.ReplaceAll(e.ChildText("[itemProp=\"price\"]"), " ", "")
+		price := strings.ReplaceAll(e.ChildText(".price.item-price__actual span"), " ", "")
 		artikul := strings.TrimSpace(e.ChildText(".itemArt span"))
 		itemTitle := strings.TrimSpace(e.ChildText(".itemTitle span"))
 		href := e.ChildAttr(".itemTitle a", "href")
