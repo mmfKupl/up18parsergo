@@ -30,8 +30,13 @@ func StartParser(parserMode Mode, externalType string) {
 			StartBashmaistoraParser(parserParams)
 		case "japan-ukraine.com":
 			JapanUkraineParser(parserParams)
-		default:
+		case "tpro.by":
+			StartTproParser(parserParams)
+		case "dw_st_bad.ru":
 			StartDW_ST_BADParser(parserParams)
+		default:
+			fmt.Printf("Такой сайт пока еще не распарсить")
+			os.Exit(1)
 		}
 	}
 }
