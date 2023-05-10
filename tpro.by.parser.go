@@ -1,13 +1,13 @@
 package parser
 
 import (
-	"context"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/reactivex/rxgo/v2"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +34,7 @@ func StartTproParser(parserParams *ParserParams) {
 
 	itemsToSaveChan := make(chan Item)
 	var wg sync.WaitGroup
+	var wgForItems sync.WaitGroup
 
 	err = ListenExternalItemsAndSaveToFile(itemsToSaveChan, parserParams, &wg)
 	if err != nil {
@@ -44,33 +45,53 @@ func StartTproParser(parserParams *ParserParams) {
 	tempItemsToSaveChan := make(chan rxgo.Item)
 	tempPageToVisitChan := make(chan rxgo.Item)
 
-	zipper := func(_ context.Context, item interface{}, page interface{}) (interface{}, error) {
+	rxgo.FromChannel(tempPageToVisitChan).ForEach(func(page interface{}) {
+		if link, ok := page.(string); ok {
+
+			if link == "finish" {
+				wgForItems.Done()
+				close(tempPageToVisitChan)
+				return
+			}
+
+			fmt.Println("Будет посещена следующая страница (zipper)", link)
+			visited, err := c.HasVisited(link)
+			if err != nil {
+				fmt.Println("Не удалось проверить ссылку на посещение - ", link, err)
+			}
+			if !visited {
+				err := c.Visit(link)
+				if err != nil {
+					fmt.Println("Не удалось посетить ссылку - ", link, err)
+				}
+			} else {
+				fmt.Println("Страница уже посещена - ", link)
+			}
+		} else {
+			fmt.Printf("Не удалось определить ссылку - %s\n", link)
+		}
+	}, nil,
+		func() {
+			fmt.Println("Комплит потока")
+		},
+	)
+
+	rxgo.FromChannel(tempItemsToSaveChan).ForEach(func(item interface{}) {
 		if validItem, ok := item.(Item); ok && validItem != nil {
 			wg.Add(1)
+			fmt.Println("Будет сохранен элемент:", validItem.GetId())
 			itemsToSaveChan <- validItem
+			wgForItems.Done()
 		} else {
 			if item != nil {
 				fmt.Printf("Не удалось определить элемент - %s\n", item)
 			}
 		}
-
-		if link, ok := page.(string); ok {
-			err := c.Visit(link)
-			if err != nil {
-				fmt.Println("Не удалось посетить ссылку - ", link)
-			}
-		} else {
-			fmt.Printf("Не удалось определить ссылку - %s\n", link)
-		}
-		return nil, nil
-	}
-
-	rxgo.FromChannel(tempItemsToSaveChan).ZipFromIterable(rxgo.FromChannel(tempPageToVisitChan), zipper).ForEach(func(_ interface{}) {}, nil, nil)
-
-	tempItemsToSaveChan <- rxgo.Item{}
+	}, nil, func() {})
 
 	LogPageVisiting(c)
-	findItemsAndVisitItTpro(c, tempPageToVisitChan)
+	wgForItems.Add(1)
+	findItemsAndVisitItTpro(c, tempPageToVisitChan, &wgForItems)
 	parseItemPage_Tpro(c, parserParams, tempItemsToSaveChan)
 
 	err = c.Visit(parserParams.UrlToParse)
@@ -78,14 +99,17 @@ func StartTproParser(parserParams *ParserParams) {
 		fmt.Printf("Не удалось открыть начальную страницу %s: %s\n.", parserParams.UrlToParse, err)
 	}
 
-	c.Wait()
-	tempPageToVisitChan <- rxgo.Item{}
+	wgForItems.Wait()
+	close(tempItemsToSaveChan)
 	close(itemsToSaveChan)
+
 	wg.Wait()
+	fmt.Println("Завершение работы парсера")
 }
 
-func findItemsAndVisitItTpro(c *colly.Collector, pageChan chan<- rxgo.Item) {
+func findItemsAndVisitItTpro(c *colly.Collector, pageChan chan<- rxgo.Item, wg *sync.WaitGroup) {
 	// on main container
+	pageNumber := 1
 	c.OnHTML("#catalog", func(e *colly.HTMLElement) {
 		visitPage := func(s *goquery.Selection) {
 			href, _ := s.Attr("href")
@@ -103,32 +127,47 @@ func findItemsAndVisitItTpro(c *colly.Collector, pageChan chan<- rxgo.Item) {
 			linkToMiniImage := GetValidLinkOr(miniImage, baseTproUrl, miniImage)
 
 			linkQuery := parsedLink.Query()
+			linkQuery.Set("PAGE_NUMBER", strconv.Itoa(pageNumber))
 			linkQuery.Set("MINI_IMAGE_TO_PARSE", linkToMiniImage)
 
 			parsedLink.RawQuery = linkQuery.Encode()
 			finalLink := parsedLink.String()
 
 			pageChan <- rxgo.Item{V: finalLink}
+			wg.Add(1)
 		}
 
 		articlesSelector := ".item.product.sku .productTable a.picture"
 		articles := e.DOM.Find(articlesSelector)
 
+		fmt.Println("Количество элементов на странице: ", articles.Length())
+
 		nextPaginatorButton := e.DOM.Find(".productList + .bx-pagination .bx-pag-next > a")
 		nextHref, _ := nextPaginatorButton.Attr("href")
 		nextHref = strings.TrimSpace(nextHref)
+
+		isLastPage := nextHref == ""
+
+		articles.Each(func(i int, s *goquery.Selection) {
+			visitPage(s)
+		})
+
+		if isLastPage {
+			fmt.Println("Пагинация закончилась")
+			pageChan <- rxgo.Item{V: "finish"}
+			return
+		}
+
 		nextLinkTo := GetValidLinkOr(nextHref, baseTproUrl, nextHref)
 
 		if nextLinkTo != "" {
+			pageNumber++
+			fmt.Println("Будет посещена следующая страница (пагинация)", nextLinkTo)
 			err := c.Visit(nextLinkTo)
 			if err != nil {
 				fmt.Printf("Не удалось перейти на следующую страницу для ссылки %s.\n", nextLinkTo)
 			}
 		}
-
-		articles.Each(func(i int, s *goquery.Selection) {
-			visitPage(s)
-		})
 	})
 }
 
@@ -188,11 +227,11 @@ func parseItemPage_Tpro(c *colly.Collector, params *ParserParams, itemsToSaveCha
 
 		item := &ExternalItem{
 			Articul:       articul,
-			Description:   sanitizer.Sanitize(description),
+			Description:   strings.TrimSpace(sanitizer.Sanitize(description)),
 			Image:         image,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.Sanitize(technicalAttr)),
+			TechnicalAttr: strings.TrimSpace(fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.Sanitize(technicalAttr))),
 		}
 
 		itemsToSaveChan <- rxgo.Item{V: item}
