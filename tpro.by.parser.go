@@ -215,7 +215,13 @@ func parseItemPage_Tpro(c *colly.Collector, params *ParserParams, itemsToSaveCha
 		} else {
 
 			technicalAttrElement.Find(".heading").Each(func(_ int, selection *goquery.Selection) {
-				selection.Parent().Remove()
+				selection.Remove()
+			})
+
+			technicalAttrElement.Find(".cap").Each(func(_ int, selection *goquery.Selection) {
+				if strings.Contains(selection.Text(), "Прочие") {
+					selection.Remove()
+				}
 			})
 
 			technicalAttr, err = technicalAttrElement.Html()
@@ -227,11 +233,11 @@ func parseItemPage_Tpro(c *colly.Collector, params *ParserParams, itemsToSaveCha
 
 		item := &ExternalItem{
 			Articul:       articul,
-			Description:   strings.TrimSpace(sanitizer.Sanitize(description)),
+			Description:   strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(description)),
 			Image:         image,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: strings.TrimSpace(fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.Sanitize(technicalAttr))),
+			TechnicalAttr: strings.TrimSpace(fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.SkipElementsContent("br").Sanitize(technicalAttr))),
 		}
 
 		itemsToSaveChan <- rxgo.Item{V: item}
