@@ -19,11 +19,15 @@ func GetValidPath(elem ...string) string {
 	return path.Join(append(items, elem...)...)
 }
 
-func DownloadImageIfNeed(url string, params *ParserParams, base url.URL) (string, error) {
-	return DownloadNamedImageIfNeed(url, params, base, "")
+func DownloadImageIfNeedInLowerRegister(url string, params *ParserParams, base url.URL) (string, error) {
+	return DownloadNamedImageIfNeed(url, params, base, "", true)
 }
 
-func DownloadNamedImageIfNeed(url string, params *ParserParams, base url.URL, imageName string) (string, error) {
+func DownloadImageIfNeed(url string, params *ParserParams, base url.URL) (string, error) {
+	return DownloadNamedImageIfNeed(url, params, base, "", false)
+}
+
+func DownloadNamedImageIfNeed(url string, params *ParserParams, base url.URL, imageName string, lower bool) (string, error) {
 	fullUrl, err := GetValidLink(url, base)
 	if err != nil {
 		return "", err
@@ -34,6 +38,11 @@ func DownloadNamedImageIfNeed(url string, params *ParserParams, base url.URL, im
 		fileType := GetImageType(fullUrl)
 		imageName += "." + fileType
 	}
+
+	if lower {
+		imageName = strings.ToLower(imageName)
+	}
+
 	imagePath := GetValidPath(params.ImagesFolderPath, imageName)
 
 	if _, err := os.Stat(imagePath); err == nil {

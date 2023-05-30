@@ -203,7 +203,7 @@ func parseItemPage_mk(c *colly.Collector, params *ParserParams, itemsToSaveChan 
 		imageLink := e.ChildAttr(".large .swiper-wrapper .detail-img", "href")
 		image := imageLink
 		if !params.WithoutImages && imageLink != "" {
-			image, err = DownloadImageIfNeed(imageLink, params, baseMakitaUrl)
+			image, err = DownloadImageIfNeedInLowerRegister(imageLink, params, baseMakitaUrl)
 			if err != nil {
 				fmt.Println(err)
 			}

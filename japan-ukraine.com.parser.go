@@ -143,7 +143,7 @@ func parseItemPage_ju(c *colly.Collector, params *ParserParams, itemsToSaveChan 
 
 		image := imageLink
 		if !params.WithoutImages && imageLink != "" {
-			image, err = DownloadNamedImageIfNeed(imageLink, params, baseJapanUkraine, articul)
+			image, err = DownloadNamedImageIfNeed(imageLink, params, baseJapanUkraine, articul, false)
 			if err != nil {
 				fmt.Println(err)
 			}
