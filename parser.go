@@ -34,6 +34,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartTproParser(parserParams)
 		case "dw_st_bad.ru":
 			StartDW_ST_BADParser(parserParams)
+		case "dw4you.ru":
+			StartDW4YouParser(parserParams)
 		default:
 			fmt.Printf("Такой сайт пока еще не распарсить")
 			os.Exit(1)
