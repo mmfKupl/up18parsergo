@@ -28,6 +28,7 @@ const (
 	urlsToParsePathArg__description = "Путь к json файлу, в котором лежит массив ссылок, которых нужно распарсить.\n"
 
 	DefaultDataFilePath          = "data.json"
+	DefaultSmallDataFilePath     = "small-data.json"
 	dataFilePathArg              = "fileName"
 	dataFilePathArg__short       = "fn"
 	dataFilePathArg__description = "(по умолчанию `data.json`) Название файла, в который будет загружена скачанная информация.\n"
@@ -45,11 +46,12 @@ const (
 
 func NewParserParams() *ParserParams {
 	return &ParserParams{
-		ParserMode:       DefaultParserMode,
-		UrlToParse:       "",
-		ImagesFolderPath: DefaultImagesFolderPath,
-		DataFilePath:     DefaultDataFilePath,
-		WithoutImages:    DefaultWithoutImages,
+		ParserMode:        DefaultParserMode,
+		UrlToParse:        "",
+		ImagesFolderPath:  DefaultImagesFolderPath,
+		DataFilePath:      DefaultDataFilePath,
+		SmallDataFilePath: DefaultSmallDataFilePath,
+		WithoutImages:     DefaultWithoutImages,
 	}
 }
 
@@ -152,6 +154,15 @@ func initParser(params *ParserParams) error {
 		_, err = os.Create(dataFilePath)
 		if err != nil {
 			return fmt.Errorf("неудалось создать файл с данными `%s`: %s", dataFilePath, err)
+		}
+	}
+
+	smallDataFilePath := GetValidPath(params.SmallDataFilePath)
+
+	if _, err := os.Stat(smallDataFilePath); os.IsNotExist(err) {
+		_, err = os.Create(smallDataFilePath)
+		if err != nil {
+			return fmt.Errorf("неудалось создать файл с данными `%s`: %s", smallDataFilePath, err)
 		}
 	}
 

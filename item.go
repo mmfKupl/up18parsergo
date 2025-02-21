@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	startFileLength = len("{\n  \"mappedParsedData\": [\n")
-	endFileLength   = len("\n  ]\n}")
+	startFileLength      = len("{\n  \"mappedParsedData\": [\n")
+	endFileLength        = len("\n  ]\n}")
+	startSmallFileLength = len("[\n")
+	endSmallFileLength   = len("\n]")
 )
 
 func AppendItemToFile(item Item, file *os.File) error {
@@ -42,6 +44,34 @@ func AppendItemToFile(item Item, file *os.File) error {
 	return err
 }
 
+func AppendItemToSmallFile(item Item, file *os.File) error {
+	items := make([]Item, 1)
+	items[0] = item
+
+	itemsArray := make([]Item, 1)
+	itemsArray[0] = item
+
+	jsonItems, err := json.MarshalIndent(itemsArray, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to read small file info: %s", err)
+	}
+
+	if fileInfo.Size() == 0 {
+		_, err = file.Write(jsonItems)
+		return err
+	}
+
+	jsonItems = jsonItems[startSmallFileLength:]
+
+	_, err = file.WriteAt(append([]byte(",\n"), jsonItems...), fileInfo.Size()-int64(endSmallFileLength))
+	return err
+}
+
 func AppendUnparsedItemToFile(item Item) {
 	filePath := GetValidPath("__crushed-items.json")
 	file, err := CreateAndGetFile(filePath, os.O_WRONLY)
@@ -51,6 +81,20 @@ func AppendUnparsedItemToFile(item Item) {
 	}
 
 	err = AppendItemToFile(item, file)
+	if err != nil {
+		fmt.Printf("Не удалось записать неудавшиеся данные в новый файл: %s, %s: %s\n", item.GetId(), item.GetLink(), err)
+	}
+}
+
+func AppendUnparsedItemToSmallFile(item Item) {
+	filePath := GetValidPath("__crushed-items.json")
+	file, err := CreateAndGetFile(filePath, os.O_WRONLY)
+	if err != nil {
+		fmt.Printf("Не удалось открыть новый файл.\n")
+		return
+	}
+
+	err = AppendItemToSmallFile(item, file)
 	if err != nil {
 		fmt.Printf("Не удалось записать неудавшиеся данные в новый файл: %s, %s: %s\n", item.GetId(), item.GetLink(), err)
 	}
@@ -118,6 +162,12 @@ func ListenExternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *Parse
 		return err
 	}
 
+	smallFilePath := GetValidPath(params.SmallDataFilePath)
+	smallFile, err := os.OpenFile(smallFilePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
 	wg.Add(1)
 	go func() {
 		for item := range itemsToSaveChan {
@@ -125,6 +175,11 @@ func ListenExternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *Parse
 			if err != nil {
 				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
 				AppendUnparsedItemToFile(item)
+			}
+			err = AppendItemToSmallFile(item, smallFile)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
+				AppendUnparsedItemToSmallFile(item)
 			}
 			fmt.Printf("Сохранен элемент %s, %s\n", item.GetId(), item.GetLink())
 			wg.Done()
@@ -143,10 +198,21 @@ func ListenInternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *Parse
 		return err
 	}
 
+	smallFilePath := GetValidPath(params.SmallDataFilePath)
+	smallFile, err := os.OpenFile(smallFilePath, os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+
 	wg.Add(1)
 	go func() {
 		for item := range itemsToSaveChan {
 			err := AppendItemToFile(item, file)
+			if err != nil {
+				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
+				AppendUnparsedItemToFile(item)
+			}
+			err = AppendItemToSmallFile(item, smallFile)
 			if err != nil {
 				fmt.Printf("Неудалось записать в файл: %s, %s: %s\n", item.GetLink(), item.GetId(), err)
 				AppendUnparsedItemToFile(item)

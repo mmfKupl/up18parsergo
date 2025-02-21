@@ -5,6 +5,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/reactivex/rxgo/v2"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -243,13 +244,68 @@ func parseItemPage_Garwin(c *colly.Collector, params *ParserParams, itemsToSaveC
 	})
 }
 
-// extractImageURLsFromHTML receives the input data as a byte slice, extracts image IDs,
-// and returns a slice of full image URLs using width 768 and JPEG format.
+// splitAndTrim splits a string by commas and trims spaces from each element.
+func splitAndTrim(s string) []string {
+	parts := strings.Split(s, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
+}
+
+// splitByCommaOutsideQuotes splits a string by commas but ignores commas inside quotes.
+func splitByCommaOutsideQuotes(input string) []string {
+	var result []string
+	var current strings.Builder
+	inQuotes := false
+
+	for i := 0; i < len(input); i++ {
+		char := input[i]
+
+		switch char {
+		case '"':
+			inQuotes = !inQuotes // Toggle inQuotes state when encountering a quote
+			current.WriteByte(char)
+		case ',':
+			if inQuotes {
+				// If inside quotes, keep the comma as part of the value
+				current.WriteByte(char)
+			} else {
+				// If outside quotes, split here
+				result = append(result, strings.TrimSpace(current.String()))
+				current.Reset()
+			}
+		default:
+			current.WriteByte(char)
+		}
+	}
+
+	// Add the last portion of the string
+	result = append(result, strings.TrimSpace(current.String()))
+
+	return result
+}
+
+// extractImageURLsFromHTML receives the input data as a byte slice,
+// locates the root self-invoking function assigned to window.__NUXT__,
+// extracts its parameter list and its invocation argument list,
+// then finds the images array and for each image id (literal or variable)
+// builds and returns the full image URL using width 768 and JPEG format.
 func extractImageURLsFromHTML(data []byte) ([]string, error) {
 	text := string(data)
 
+	// Revised regex for the root function.
+	// It matches: window.__NUXT__=(function(...){...}(...))
+	reFunc := regexp.MustCompile(`window\.__NUXT__=\(function\((.*)\){.*}\((.*)\)\)`)
+	funcMatches := reFunc.FindStringSubmatch(text)
+	var paramList, argList []string
+	if funcMatches != nil && len(funcMatches) >= 3 {
+		paramList = splitAndTrim(funcMatches[1])
+		argList = splitByCommaOutsideQuotes(funcMatches[2])
+		// Note: if counts differ, later lookups may fail.
+	}
+
 	// Find the images array block.
-	// It matches: images: [ ... ]
 	reImagesBlock := regexp.MustCompile(`images\s*:\s*\[([\s\S]*?)\]`)
 	imagesBlockMatch := reImagesBlock.FindStringSubmatch(text)
 	if imagesBlockMatch == nil || len(imagesBlockMatch) < 2 {
@@ -257,9 +313,8 @@ func extractImageURLsFromHTML(data []byte) ([]string, error) {
 	}
 	imagesContent := imagesBlockMatch[1]
 
-	// Find all image IDs inside the images array.
-	// It matches patterns like: id: "some-image-id"
-	reImageID := regexp.MustCompile(`id\s*:\s*"([^"]+)"`)
+	// This regex matches an id field that is either a quoted string literal or a bare variable.
+	reImageID := regexp.MustCompile(`id\s*:\s*(?:"([^"]+)"|([A-Za-z0-9_$]+))`)
 	idMatches := reImageID.FindAllStringSubmatch(imagesContent, -1)
 	if idMatches == nil {
 		return nil, fmt.Errorf("no image IDs found")
@@ -267,19 +322,48 @@ func extractImageURLsFromHTML(data []byte) ([]string, error) {
 
 	var urls []string
 	for _, match := range idMatches {
-		if len(match) < 2 {
+		var imageID string
+		if match[1] != "" {
+			// Literal string: use it directly.
+			imageID = match[1]
+		} else if match[2] != "" && len(paramList) > 0 && len(argList) > 0 {
+			// Variable reference: find its index in the parameter list.
+			varName := match[2]
+			index := -1
+			for i, p := range paramList {
+				if p == varName {
+					index = i
+					break
+				}
+			}
+			if index >= 0 && index < len(argList) {
+				// Remove any surrounding quotes from the argument.
+				imageID = strings.Trim(argList[index], `"`)
+			} else {
+				continue
+			}
+		} else {
 			continue
 		}
-		imageID := match[1]
-		// Ensure the imageID is long enough for substring extraction.
+
+		// Validate that the imageID is long enough to extract path parts.
 		if len(imageID) < 4 {
 			continue
 		}
 		part1 := imageID[0:2]
 		part2 := imageID[2:4]
 		// Build the URL using width 768 and JPEG format ("r" suffix).
-		url := fmt.Sprintf("https://media.garwin.ru/images/products/%s/%s/%s-w768r.jpeg", part1, part2, imageID)
-		urls = append(urls, url)
+		imageUrl := fmt.Sprintf("https://media.garwin.ru/images/products/%s/%s/%s-w768r.jpeg", part1, part2, imageID)
+		headResp, err := http.Head(imageUrl)
+		if err == nil && headResp.StatusCode != http.StatusNotFound {
+			urls = append(urls, imageUrl)
+		} else {
+			imageUrl = fmt.Sprintf("https://media.garwin.ru/images/products/%s/%s/%s-w768p.webp", part1, part2, imageID)
+			headResp, err = http.Head(imageUrl)
+			if err == nil && headResp.StatusCode != http.StatusNotFound {
+				urls = append(urls, imageUrl)
+			}
+		}
 	}
 	return urls, nil
 }
