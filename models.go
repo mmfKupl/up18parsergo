@@ -34,12 +34,13 @@ func (ii *InternalItem) GetId() string {
 }
 
 type ExternalItem struct {
-	Articul       string `json:"articul"`
-	Description   string `json:"description"`
-	Image         string `json:"image"`
-	LinkTo        string `json:"linkTo"`
-	Name          string `json:"name"`
-	TechnicalAttr string `json:"technical-attr"`
+	Articul       string   `json:"articul"`
+	Description   string   `json:"description"`
+	Image         string   `json:"image"`
+	Images        []string `json:"images"`
+	LinkTo        string   `json:"linkTo"`
+	Name          string   `json:"name"`
+	TechnicalAttr string   `json:"technical-attr"`
 }
 
 func (ii *ExternalItem) GetLink() string {

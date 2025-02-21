@@ -36,6 +36,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartDW_ST_BADParser(parserParams)
 		case "dw4you.ru":
 			StartDW4YouParser(parserParams)
+		case "garwin.ru":
+			StartGarwinParser(parserParams)
 		default:
 			fmt.Printf("Такой сайт пока еще не распарсить")
 			os.Exit(1)
