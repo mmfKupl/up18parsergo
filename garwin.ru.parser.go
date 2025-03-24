@@ -186,7 +186,6 @@ func parseItemPage_Garwin(c *colly.Collector, params *ParserParams, itemsToSaveC
 			imagesLinks = nil
 		}
 
-		var downloadedImage string
 		var downloadedImages []string
 
 		if imagesLinks != nil {
@@ -198,10 +197,6 @@ func parseItemPage_Garwin(c *colly.Collector, params *ParserParams, itemsToSaveC
 				}
 				downloadedImages = append(downloadedImages, downloadedImageByLink)
 			}
-		}
-
-		if len(downloadedImages) > 0 {
-			downloadedImage = downloadedImages[0]
 		}
 
 		descriptionText := e.ChildText(".ProductDetailDescription__Text")
@@ -231,9 +226,9 @@ func parseItemPage_Garwin(c *colly.Collector, params *ParserParams, itemsToSaveC
 		}
 
 		item := &ExternalItem{
-			Articul:       articul,
-			Description:   strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(description)),
-			Image:         downloadedImage,
+			Articul:     articul,
+			Description: strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(description)),
+			//Image:         downloadedImage,
 			Images:        downloadedImages,
 			LinkTo:        linkTo,
 			Name:          name,

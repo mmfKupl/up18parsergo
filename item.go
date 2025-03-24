@@ -185,6 +185,7 @@ func ListenExternalItemsAndSaveToFile(itemsToSaveChan <-chan Item, params *Parse
 			wg.Done()
 		}
 		file.Close()
+		smallFile.Close()
 		wg.Done()
 	}()
 

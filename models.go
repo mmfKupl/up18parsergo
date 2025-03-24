@@ -37,7 +37,7 @@ func (ii *InternalItem) GetId() string {
 type ExternalItem struct {
 	Articul       string   `json:"articul"`
 	Description   string   `json:"description"`
-	Image         string   `json:"image"`
+	Image         string   `json:"image,omitempty"`
 	Images        []string `json:"images"`
 	LinkTo        string   `json:"linkTo"`
 	Name          string   `json:"name"`
