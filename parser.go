@@ -38,6 +38,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartDW4YouParser(parserParams)
 		case "garwin.ru":
 			StartGarwinParser(parserParams)
+		case "bosch-professional.com":
+			StartBoshProfParser(parserParams)
 		default:
 			fmt.Printf("Такой сайт пока еще не распарсить")
 			os.Exit(1)

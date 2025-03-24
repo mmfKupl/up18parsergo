@@ -84,7 +84,15 @@ func GetValidLink(link string, base url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return base.ResolveReference(linkUrl).String(), nil
+	resolved := base.ResolveReference(linkUrl).String()
+
+	// Decode the path to keep non-ASCII characters
+	unescaped, err := url.PathUnescape(resolved)
+	if err != nil {
+		return "", err
+	}
+
+	return unescaped, nil
 }
 
 func GetValidLinkOr(link string, base url.URL, or string) string {
