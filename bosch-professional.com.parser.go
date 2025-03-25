@@ -198,8 +198,9 @@ func parseItemPage_BoshProf(c *colly.Collector, params *ParserParams, itemsToSav
 		var downloadedImages []string
 
 		if imagesLinks != nil {
-			for _, imgLink := range imagesLinks {
-				downloadedImageByLink, err := DownloadImageIfNeed(imgLink, params, baseBoshProfUrl)
+			for imageIndex, imgLink := range imagesLinks {
+				imageName := fmt.Sprintf("%s-%s", GetImageNameFromUrl(imgLink), strconv.Itoa(imageIndex))
+				downloadedImageByLink, err := DownloadNamedImageIfNeed(imgLink, params, baseBoshProfUrl, imageName, false)
 				if err != nil {
 					fmt.Println(err)
 					continue
@@ -236,11 +237,11 @@ func parseItemPage_BoshProf(c *colly.Collector, params *ParserParams, itemsToSav
 
 		item := &ExternalItem{
 			Articul:       articul,
-			Description:   strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(description)),
+			Description:   ReplaceMultiSpaces(sanitizer.SkipElementsContent("br").Sanitize(description)),
 			Images:        downloadedImages,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(technicalAttr)),
+			TechnicalAttr: ReplaceMultiSpaces(sanitizer.SkipElementsContent("br").Sanitize(technicalAttr)),
 		}
 
 		itemsToSaveChan <- rxgo.Item{V: item}

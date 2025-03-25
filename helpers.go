@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
@@ -115,4 +116,9 @@ func LogPageVisiting(c *colly.Collector) {
 	c.OnRequest(func(r *colly.Request) {
 		fmt.Printf("Парсим следующую страницу - %s\n", r.URL.String())
 	})
+}
+
+func ReplaceMultiSpaces(s string) string {
+	re := regexp.MustCompile(`\s+`)
+	return strings.TrimSpace(re.ReplaceAllString(s, " "))
 }

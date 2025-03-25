@@ -226,13 +226,12 @@ func parseItemPage_Garwin(c *colly.Collector, params *ParserParams, itemsToSaveC
 		}
 
 		item := &ExternalItem{
-			Articul:     articul,
-			Description: strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(description)),
-			//Image:         downloadedImage,
+			Articul:       articul,
+			Description:   ReplaceMultiSpaces(sanitizer.SkipElementsContent("br").Sanitize(description)),
 			Images:        downloadedImages,
 			LinkTo:        linkTo,
 			Name:          name,
-			TechnicalAttr: strings.TrimSpace(sanitizer.SkipElementsContent("br").Sanitize(technicalAttr)),
+			TechnicalAttr: ReplaceMultiSpaces(sanitizer.SkipElementsContent("br").Sanitize(technicalAttr)),
 		}
 
 		itemsToSaveChan <- rxgo.Item{V: item}
