@@ -170,7 +170,7 @@ func findItemsAndVisitIt_BoshProf(c *colly.Collector, pageChan chan<- rxgo.Item,
 }
 
 func parseItemPage_BoshProf(c *colly.Collector, params *ParserParams, itemsToSaveChan chan<- rxgo.Item) {
-	c.OnHTML(".t-productdetailpage .page", func(e *colly.HTMLElement) {
+	c.OnHTML(".t-productdetailpage main", func(e *colly.HTMLElement) {
 		var err error
 
 		articul := e.DOM.Find(".o-b-product_variations__product--selected .a-ordernumber").Text()
