@@ -13,7 +13,7 @@ import (
 
 var baseDewaltUrl = url.URL{
 	Scheme: "https",
-	Host:   "shop.dewalt.ru",
+	Host:   "dewalt.store",
 }
 
 var baseStanlyUrl = url.URL{
