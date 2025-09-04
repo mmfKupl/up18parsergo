@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -90,6 +91,9 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 		}
 
 		articul := strings.TrimSpace(e.ChildText(".product-card .product-card__sku span"))
+		articul = regexp.MustCompile(`-[A-Z]{2}$`).ReplaceAllString(articul, "")
+		articul = strings.TrimSpace(articul)
+
 		href := e.Request.URL.String()
 		linkTo := GetValidLinkOr(href, baseDW_ST_BADUrl, href)
 
