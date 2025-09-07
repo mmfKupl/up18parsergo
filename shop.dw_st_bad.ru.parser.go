@@ -133,19 +133,25 @@ func findAndParseItemsOnPage_dw(c *colly.Collector, params *ParserParams, itemsT
 
 		name := strings.TrimSpace(e.ChildText(".product-card .product-card__title"))
 
-		imageLink := e.ChildAttr(".images-gallery__items .images-gallery__slide", "data-src")
-		image := imageLink
-		if !params.WithoutImages && imageLink != "" {
-			image, err = DownloadImageIfNeed(imageLink, params, baseDW_ST_BADUrl)
-			if err != nil {
-				fmt.Println(err)
+		var downloadedImages []string
+		imageElementsDataSrc := e.DOM.Find(".images-gallery__items .images-gallery__slide").Map(func(i int, selection *goquery.Selection) string {
+			return selection.AttrOr("data-src", "")
+		})
+		for _, imageDataSrc := range imageElementsDataSrc {
+			image := imageDataSrc
+			if !params.WithoutImages && image != "" {
+				image, err = DownloadImageIfNeed(image, params, baseDW_ST_BADUrl)
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
+			downloadedImages = append(downloadedImages, image)
 		}
 
 		item := &ExternalItem{
 			Articul:       articul,
 			Description:   sanitizer.Sanitize(description),
-			Image:         image,
+			Images:        downloadedImages,
 			LinkTo:        linkTo,
 			Name:          name,
 			TechnicalAttr: fmt.Sprintf("<div class=\"dw-pars\">%s</div>", sanitizer.Sanitize(technicalAttr)),
