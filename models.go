@@ -8,14 +8,16 @@ type Item interface {
 }
 
 type ParserParams struct {
-	ParserMode        Mode
-	baseURLName       string
-	UrlsToParsePath   string
-	UrlToParse        string
-	ImagesFolderPath  string
-	DataFilePath      string
-	SmallDataFilePath string
-	WithoutImages     bool
+	ParserMode          Mode
+	baseURLName         string
+	UrlsToParsePath     string
+	UrlToParse          string
+	ImagesFolderPath    string
+	DataFilePath        string
+	SmallDataFilePath   string
+	WithoutImages       bool
+	EmptyImageToSet     string
+	NotFollowPagination bool
 }
 
 type InternalItem struct {

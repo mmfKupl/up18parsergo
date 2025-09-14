@@ -40,6 +40,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartGarwinParser(parserParams)
 		case "bosch-professional.com":
 			StartBoshProfParser(parserParams)
+		case "up18.by":
+			StartInternalUp18Parser(parserParams)
 		default:
 			fmt.Printf("Такой сайт пока еще не распарсить")
 			os.Exit(1)

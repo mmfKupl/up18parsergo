@@ -42,16 +42,28 @@ const (
 	withoutImagesArg              = "withoutImages"
 	withoutImagesArg__short       = "wi"
 	withoutImagesArg__description = "(по умолчанию false) Указывает нужно ли скачивать картинки или нет.\n"
+
+	DefaultEmptyImageToSet          = ""
+	emptyImageToSetArg              = "emptyImageToSet"
+	emptyImageToSetArg__short       = "ei"
+	emptyImageToSerArg__description = "(ссылка на картинку) если нет картинок для товара, то будет использоваться указаная картинка"
+
+	DefaultNotFollowPagination          = false
+	notFollowPaginationArg              = "notFollowPagination"
+	notFollowPaginationArg__short       = "np"
+	notFollowPaginationArg__description = "(по умолчанию false) Если да, то не переходит по страницам пагинации\n"
 )
 
 func NewParserParams() *ParserParams {
 	return &ParserParams{
-		ParserMode:        DefaultParserMode,
-		UrlToParse:        "",
-		ImagesFolderPath:  DefaultImagesFolderPath,
-		DataFilePath:      DefaultDataFilePath,
-		SmallDataFilePath: DefaultSmallDataFilePath,
-		WithoutImages:     DefaultWithoutImages,
+		ParserMode:          DefaultParserMode,
+		UrlToParse:          "",
+		ImagesFolderPath:    DefaultImagesFolderPath,
+		DataFilePath:        DefaultDataFilePath,
+		SmallDataFilePath:   DefaultSmallDataFilePath,
+		WithoutImages:       DefaultWithoutImages,
+		EmptyImageToSet:     DefaultEmptyImageToSet,
+		NotFollowPagination: DefaultNotFollowPagination,
 	}
 }
 
@@ -72,6 +84,12 @@ func initParserParams(parentParserMode Mode) *ParserParams {
 
 	withoutImageLongRef := flag.Bool(withoutImagesArg, DefaultWithoutImages, withoutImagesArg__description)
 	withoutImageShortRef := flag.Bool(withoutImagesArg__short, DefaultWithoutImages, withoutImagesArg__description)
+
+	emptyImageToSetRef := flag.String(emptyImageToSetArg, DefaultEmptyImageToSet, emptyImageToSerArg__description)
+	emptyImageToSetShortRef := flag.String(emptyImageToSetArg__short, DefaultEmptyImageToSet, emptyImageToSerArg__description)
+
+	notFollowPaginationRef := flag.Bool(notFollowPaginationArg, DefaultNotFollowPagination, notFollowPaginationArg__description)
+	notFollowPaginationShortRef := flag.Bool(notFollowPaginationArg__short, DefaultNotFollowPagination, notFollowPaginationArg__description)
 
 	flag.Parse()
 
@@ -121,6 +139,20 @@ func initParserParams(parentParserMode Mode) *ParserParams {
 		}
 	} else {
 		params.WithoutImages = *withoutImageLongRef
+	}
+
+	if *emptyImageToSetRef != "" {
+		params.EmptyImageToSet = *emptyImageToSetRef
+	}
+	if *emptyImageToSetShortRef != "" {
+		params.EmptyImageToSet = *emptyImageToSetShortRef
+	}
+
+	if params.NotFollowPagination != *notFollowPaginationRef {
+		params.NotFollowPagination = *notFollowPaginationRef
+	}
+	if params.NotFollowPagination != *notFollowPaginationShortRef {
+		params.NotFollowPagination = *notFollowPaginationShortRef
 	}
 
 	return params
