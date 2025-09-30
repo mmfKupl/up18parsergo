@@ -38,6 +38,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartDW4YouParser(parserParams)
 		case "garwin.ru":
 			StartGarwinParser(parserParams)
+		case "mitools.by":
+			StartMitoolsByParser(parserParams)
 		case "bosch-professional.com":
 			StartBoshProfParser(parserParams)
 		case "up18.by":
