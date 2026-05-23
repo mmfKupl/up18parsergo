@@ -44,6 +44,8 @@ func StartParser(parserMode Mode, externalType string) {
 			StartBoshProfParser(parserParams)
 		case "up18.by":
 			StartInternalUp18Parser(parserParams)
+		case "runtec-shop.ru":
+			StartRuntecShopParser(parserParams)
 		default:
 			fmt.Printf("Такой сайт пока еще не распарсить")
 			os.Exit(1)
